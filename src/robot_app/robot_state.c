@@ -4,18 +4,45 @@
 #include <stdio.h>
 #include <assert.h>
 
+// Définition des constantes internes
+#define NB_EVENT 7
+#define NB_STATE 6
+
+// Définitions privées des types
+typedef enum {
+    A_NOP = 0,
+    A_START,
+    A_STOP,
+    A_MOVE_FORWARD,
+    A_TURN_LEFT,
+    A_TURN_RIGHT,
+    A_HANDLE_OBSTACLE,
+    A_HANDLE_LOW_BATTERY
+} action_t;
+
 // Structure cachée pour l'état du robot
 struct robot_state_s {
-    robot_state_type_t current_state;
+    int current_state;
 };
 
-// Tableau de transitions d'état
+// Structure de transition
 typedef struct {
-    robot_state_type_t next_state;
-    void (*action)(void);
+    int next_state;
+    action_t action;
 } transition_t;
 
-// Actions possibles
+// Noms des états pour affichage/communication
+static const char* state_names[] = {
+    "IDLE",
+    "MOVING_FORWARD",
+    "TURNING_LEFT",
+    "TURNING_RIGHT",
+    "STOPPED",
+    "ERROR"
+};
+
+// Prototypes des fonctions d'action privées
+static void perform_action(action_t action);
 static void action_start(void);
 static void action_stop(void);
 static void action_move_forward(void);
@@ -26,26 +53,23 @@ static void action_handle_low_battery(void);
 static void action_nop(void);
 
 // Table de transition
-static transition_t transition_table[6][7] = {
+static transition_t transition_table[NB_STATE][NB_EVENT] = {
     // STATE_IDLE
-    [STATE_IDLE] = {
-        [EV_START] = {STATE_IDLE, action_start},
-        [EV_FORWARD] = {STATE_MOVING_FORWARD, action_move_forward},
-        [EV_TURN_LEFT] = {STATE_TURNING_LEFT, action_turn_left},
-        [EV_TURN_RIGHT] = {STATE_TURNING_RIGHT, action_turn_right},
+    [0] = {
+        [0] = {0, A_START},               // EV_START
+        [2] = {1, A_MOVE_FORWARD},        // EV_FORWARD -> STATE_MOVING_FORWARD
+        [3] = {2, A_TURN_LEFT},           // EV_TURN_LEFT -> STATE_TURNING_LEFT
+        [4] = {3, A_TURN_RIGHT},          // EV_TURN_RIGHT -> STATE_TURNING_RIGHT
+        [1] = {4, A_STOP},                // EV_STOP -> STATE_STOPPED
+        // autres transitions...
+    },
+    // STATE_MOVING_FORWARD
+    [1] = {
+        [1] = {4, A_STOP},                // EV_STOP -> STATE_STOPPED
+        [5] = {4, A_HANDLE_OBSTACLE},     // EV_OBSTACLE_DETECTED -> STATE_STOPPED
         // autres transitions...
     },
     // Autres états...
-};
-
-// Noms des états pour affichage/communication
-static const char* state_names[] = {
-    "IDLE",
-    "MOVING_FORWARD",
-    "TURNING_LEFT",
-    "TURNING_RIGHT",
-    "STOPPED",
-    "ERROR"
 };
 
 // Implémentation des fonctions
@@ -61,24 +85,63 @@ void RobotState_free(RobotState* this) {
     free(this);
 }
 
-void RobotState_handle_event(RobotState* this, robot_event_t event) {
+void RobotState_handle_event(RobotState* this, int event) {
+    // Vérification de validité
+    if (event < 0 || event >= NB_EVENT || this->current_state < 0 || this->current_state >= NB_STATE) {
+        return;
+    }
+    
     transition_t transition = transition_table[this->current_state][event];
     
-    // Appliquer l'action si définie
-    if (transition.action) {
-        transition.action();
-    }
+    // Appliquer l'action
+    perform_action(transition.action);
     
     // Mettre à jour l'état
     this->current_state = transition.next_state;
 }
 
-robot_state_type_t RobotState_get_state(RobotState* this) {
+int RobotState_get_state(RobotState* this) {
     return this->current_state;
 }
 
 const char* RobotState_get_state_name(RobotState* this) {
-    return state_names[this->current_state];
+    if (this->current_state >= 0 && this->current_state < NB_STATE) {
+        return state_names[this->current_state];
+    }
+    return "UNKNOWN";
+}
+
+// Fonction d'exécution des actions
+static void perform_action(action_t action) {
+    switch(action) {
+        case A_NOP:
+            action_nop();
+            break;
+        case A_START:
+            action_start();
+            break;
+        case A_STOP:
+            action_stop();
+            break;
+        case A_MOVE_FORWARD:
+            action_move_forward();
+            break;
+        case A_TURN_LEFT:
+            action_turn_left();
+            break;
+        case A_TURN_RIGHT:
+            action_turn_right();
+            break;
+        case A_HANDLE_OBSTACLE:
+            action_handle_obstacle();
+            break;
+        case A_HANDLE_LOW_BATTERY:
+            action_handle_low_battery();
+            break;
+        default:
+            // Action inconnue, ne rien faire
+            break;
+    }
 }
 
 // Implémentation des actions

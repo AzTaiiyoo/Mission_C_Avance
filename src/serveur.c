@@ -39,10 +39,11 @@ void send_robot_state(RobotState* state) {
     send(client_socket, &message, sizeof(message), 0);
 }
 
+// Extrait à modifier dans serveur.c
 void process_client_command(RobotState* state, robot_message_t* command) {
     // Implémenter le traitement des commandes client
     // Par exemple, traduire les commandes en événements pour la machine à états
-    robot_event_t event;
+    int event;
     
     switch(command->state) {
         case STATE_MOVING_FORWARD:

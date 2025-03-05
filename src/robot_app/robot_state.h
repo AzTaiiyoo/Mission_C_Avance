@@ -4,40 +4,28 @@
 // Structure opaque pour l'état du robot
 typedef struct robot_state_s RobotState;
 
-// Types d'événements possibles
-typedef enum {
-    EV_START,
-    EV_STOP,
-    EV_FORWARD,
-    EV_TURN_LEFT,
-    EV_TURN_RIGHT,
-    EV_OBSTACLE_DETECTED,
-    EV_BATTERY_LOW
-} robot_event_t;
+// Définition des constantes d'événements (en tant que macros)
+#define EV_START              0
+#define EV_STOP               1
+#define EV_FORWARD            2
+#define EV_TURN_LEFT          3
+#define EV_TURN_RIGHT         4
+#define EV_OBSTACLE_DETECTED  5
+#define EV_BATTERY_LOW        6
 
-// États possibles du robot
-typedef enum {
-    STATE_IDLE,
-    STATE_MOVING_FORWARD,
-    STATE_TURNING_LEFT,
-    STATE_TURNING_RIGHT,
-    STATE_STOPPED,
-    STATE_ERROR
-} robot_state_type_t;
+// Définition des constantes d'états (en tant que macros)
+#define STATE_IDLE            0
+#define STATE_MOVING_FORWARD  1
+#define STATE_TURNING_LEFT    2
+#define STATE_TURNING_RIGHT   3
+#define STATE_STOPPED         4
+#define STATE_ERROR           5
 
-// Crée un nouvel état robot
+// Déclaration des fonctions externes
 extern RobotState* RobotState_new(void);
-
-// Libère l'état robot
 extern void RobotState_free(RobotState* this);
-
-// Traite un événement et met à jour l'état
-extern void RobotState_handle_event(RobotState* this, robot_event_t event);
-
-// Obtient l'état actuel du robot
-extern robot_state_type_t RobotState_get_state(RobotState* this);
-
-// Obtient une représentation textuelle de l'état
+extern void RobotState_handle_event(RobotState* this, int event);
+extern int RobotState_get_state(RobotState* this);
 extern const char* RobotState_get_state_name(RobotState* this);
 
 #endif // ROBOT_STATE_H

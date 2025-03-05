@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <termios.h>
 #include "robot_app/robot_comm.h"
+#include "robot_app/robot_state.h"  
 
 static int client_socket;
 static volatile int running = 1;
@@ -35,7 +36,7 @@ void disable_raw_mode() {
 }
 
 // Envoi d'une commande au serveur
-void send_command(robot_state_type_t command) {
+void send_command(int command) {
     robot_message_t message;
     memset(&message, 0, sizeof(message));
     message.state = command;

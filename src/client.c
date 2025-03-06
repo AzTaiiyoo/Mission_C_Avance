@@ -15,12 +15,12 @@ static int client_socket;
 static volatile int running = 1;
 static struct termios orig_termios;
 
-// Gestionnaire de signal pour arrêt propre
+
 void handle_signal(int signal) {
     running = 0;
 }
 
-// Configuration du mode terminal brut
+
 void enable_raw_mode() {
     struct termios raw;
     tcgetattr(STDIN_FILENO, &orig_termios);
@@ -29,12 +29,12 @@ void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
-// Restauration du mode terminal
+
 void disable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 
-// Envoi d'une commande au serveur
+
 void send_command(robot_state_type_t command) {
     robot_message_t message;
     memset(&message, 0, sizeof(message));
@@ -43,9 +43,9 @@ void send_command(robot_state_type_t command) {
     send(client_socket, &message, sizeof(message), 0);
 }
 
-// Affichage de l'état du robot
+
 void display_robot_state(const robot_message_t* state) {
-    printf("\033[2J\033[H"); // Effacer l'écran et positionner le curseur en haut
+    printf("\033[2J\033[H"); 
     printf("État du robot : %s\n", state->message);
     printf("Capteurs : Gauche=%d, Centre=%d, Droite=%d\n", 
            state->left_sensor, state->center_sensor, state->right_sensor);
@@ -63,20 +63,20 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in server_addr;
     fd_set read_fds;
     char buffer[1024];
-    char server_ip[16] = "127.0.0.1"; // Adresse par défaut
+    char server_ip[16] = "127.0.0.1"; 
     
-    // Vérifier les arguments
+   
     if (argc > 1) {
         strncpy(server_ip, argv[1], sizeof(server_ip) - 1);
     }
     
-    // Configurer gestionnaire de signal
+   
     signal(SIGINT, handle_signal);
     
-    // Activer le mode terminal brut
+    
     enable_raw_mode();
     
-    // Créer le socket
+    
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (client_socket == -1) {
         perror("Erreur création socket");
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
     
-    // Configurer l'adresse du serveur
+    
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(ROBOT_SERVER_PORT);
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
     
-    // Connexion au serveur
+    
     if (connect(client_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("Erreur connexion");
         close(client_socket);
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
     
     printf("Connecté au serveur robot (%s:%d)\n", server_ip, ROBOT_SERVER_PORT);
     
-    // Boucle principale
+    
     while (running) {
         struct timeval tv;
         int max_fd;
@@ -116,9 +116,9 @@ int main(int argc, char *argv[]) {
         FD_SET(client_socket, &read_fds);
         max_fd = (STDIN_FILENO > client_socket) ? STDIN_FILENO : client_socket;
         
-        // Configurer le timeout
+        
         tv.tv_sec = 0;
-        tv.tv_usec = 100000; // 100ms
+        tv.tv_usec = 100000; 
         
         int activity = select(max_fd + 1, &read_fds, NULL, NULL, &tv);
         
@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
         
-        // Entrée utilisateur
+        
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             char c;
             if (read(STDIN_FILENO, &c, 1) == 1) {
@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        // Données du serveur
+       
         if (FD_ISSET(client_socket, &read_fds)) {
             robot_message_t state;
             int bytes = recv(client_socket, &state, sizeof(state), 0);
@@ -170,7 +170,7 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    // Nettoyage
+    
     close(client_socket);
     disable_raw_mode();
     

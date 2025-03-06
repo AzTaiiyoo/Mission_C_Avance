@@ -5,7 +5,6 @@
 
 #define ROBOT_SERVER_PORT 12346
 
-// Structure à envoyer/recevoir
 typedef struct {
     robot_state_type_t state;       // État du robot
     int left_sensor;                // Valeur du capteur gauche

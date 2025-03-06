@@ -10,8 +10,6 @@
 #include "robot_app/robot_state.h"
 #include "robot_app/robot_comm.h"
 
-#define MAX_CLIENTS 5
-
 static int server_socket;
 static int client_socket = -1;
 static volatile int running = 1;
@@ -19,6 +17,8 @@ static volatile int running = 1;
 // Gestionnaire de signal pour arrêt propre
 void handle_signal(int signal) {
     running = 0;
+    printf("\nSignal d'interruption reçu. Arrêt en cours...\n");
+    close(server_socket);
 }
 
 void send_robot_state(RobotState* state) {
@@ -40,8 +40,6 @@ void send_robot_state(RobotState* state) {
 }
 
 void process_client_command(RobotState* state, robot_message_t* command) {
-    // Implémenter le traitement des commandes client
-    // Par exemple, traduire les commandes en événements pour la machine à états
     robot_event_t event;
     
     switch(command->state) {
@@ -120,7 +118,7 @@ int main() {
     }
     
     // Écouter les connexions
-    if (listen(server_socket, MAX_CLIENTS) < 0) {
+    if (listen(server_socket, 1) < 0) { // Un seul client en attente
         perror("Erreur listen");
         close(server_socket);
         RobotState_free(robot_state);
@@ -129,80 +127,77 @@ int main() {
     }
     
     printf("Serveur robot démarré sur le port %d...\n", ROBOT_SERVER_PORT);
+    printf("Appuyez sur Ctrl+C pour quitter\n");
     
     // Boucle principale du serveur
     while (running) {
-        fd_set read_fds;
-        struct timeval tv;
-        int max_fd;
+        // Attendre une connexion client
+        printf("En attente d'une connexion client...\n");
+        client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
         
-        FD_ZERO(&read_fds);
-        FD_SET(server_socket, &read_fds);
-        max_fd = server_socket;
-        
-        if (client_socket != -1) {
-            FD_SET(client_socket, &read_fds);
-            if (client_socket > max_fd) max_fd = client_socket;
-        }
-        
-        // Configurer le timeout
-        tv.tv_sec = 0;
-        tv.tv_usec = 100000; // 100ms
-        
-        int activity = select(max_fd + 1, &read_fds, NULL, NULL, &tv);
-        
-        if (activity < 0 && running) {
-            perror("select");
+        if (client_socket < 0) {
+            if (!running) break; // Si interruption pendant accept()
+            perror("Erreur accept");
             continue;
         }
         
-        // Nouvelle connexion
-        if (FD_ISSET(server_socket, &read_fds)) {
-            client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
-            if (client_socket < 0) {
-                perror("accept");
-                continue;
-            }
-            
-            printf("Nouvelle connexion acceptée\n");
-            
-            // Envoyer l'état initial
-            send_robot_state(robot_state);
-        }
+        printf("Client connecté\n");
         
-        // Données du client
-        if (client_socket != -1 && FD_ISSET(client_socket, &read_fds)) {
+        // Envoyer l'état initial au client
+        send_robot_state(robot_state);
+        
+        // Boucle de communication avec le client
+        while (running) {
             robot_message_t command;
-            int bytes = recv(client_socket, &command, sizeof(command), 0);
+            robot_status_t status;
+            int recv_result;
             
-            if (bytes <= 0) {
-                // Client déconnecté
+            // Configurer un timeout sur la réception
+            struct timeval tv;
+            tv.tv_sec = 0;
+            tv.tv_usec = 100000; // 100ms
+            setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+            
+            // Recevoir une commande du client
+            recv_result = recv(client_socket, &command, sizeof(command), 0);
+            
+            if (recv_result > 0) {
+                // Commande reçue, la traiter
+                process_client_command(robot_state, &command);
+                send_robot_state(robot_state);
+            } 
+            else if (recv_result == 0) {
+                // Connexion fermée par le client
                 printf("Client déconnecté\n");
                 close(client_socket);
                 client_socket = -1;
-            }
+                break;
+            } 
             else {
-                // Traiter la commande
-                process_client_command(robot_state, &command);
+                // Erreur ou timeout sur recv()
+                if (!running) break;
                 
-                // Envoyer l'état mis à jour
-                send_robot_state(robot_state);
+                // Vérifier l'état du robot pendant les timeouts
+                status = robot_get_status();
+                
+                // Détecter les obstacles
+                if (status.center_sensor < 120 || status.left_sensor < 120 || status.right_sensor < 120) {
+                    RobotState_handle_event(robot_state, EV_OBSTACLE_DETECTED);
+                    send_robot_state(robot_state);
+                }
+                
+                // Détecter batterie faible
+                if (status.battery < 20) {
+                    RobotState_handle_event(robot_state, EV_BATTERY_LOW);
+                    send_robot_state(robot_state);
+                }
             }
         }
         
-        // Vérifier l'état du robot et mettre à jour si nécessaire
-        robot_status_t status = robot_get_status();
-        
-        // Détecter les obstacles
-        if (status.center_sensor < 120 || status.left_sensor < 120 || status.right_sensor < 120) {
-            RobotState_handle_event(robot_state, EV_OBSTACLE_DETECTED);
-            send_robot_state(robot_state);
-        }
-        
-        // Détecter batterie faible
-        if (status.battery < 20) {
-            RobotState_handle_event(robot_state, EV_BATTERY_LOW);
-            send_robot_state(robot_state);
+        // Si on sort de la boucle client, fermer le socket client
+        if (client_socket != -1) {
+            close(client_socket);
+            client_socket = -1;
         }
     }
     

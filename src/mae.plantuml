@@ -1,0 +1,63 @@
+@startuml Robot State Machine
+
+' Define states
+state "IDLE" as idle
+state "MOVING_FORWARD" as moving
+state "TURNING_LEFT" as left
+state "TURNING_RIGHT" as right
+state "STOPPED" as stopped
+state "ERROR" as error
+
+' Define initial state
+[*] --> idle
+
+' Transitions from IDLE
+idle --> idle : EV_START / action_start
+idle --> moving : EV_FORWARD / action_move_forward
+idle --> left : EV_TURN_LEFT / action_turn_left
+idle --> right : EV_TURN_RIGHT / action_turn_right
+idle --> stopped : EV_STOP / action_stop
+
+' Transitions from MOVING_FORWARD
+moving --> left : EV_TURN_LEFT / action_turn_left
+moving --> right : EV_TURN_RIGHT / action_turn_right
+moving --> stopped : EV_STOP / action_stop
+moving --> stopped : EV_OBSTACLE_DETECTED / action_handle_obstacle
+
+' Transitions from TURNING_LEFT
+left --> moving : EV_FORWARD / action_move_forward
+left --> right : EV_TURN_RIGHT / action_turn_right
+left --> stopped : EV_STOP / action_stop
+left --> stopped : EV_OBSTACLE_DETECTED / action_handle_obstacle
+
+' Transitions from TURNING_RIGHT
+right --> moving : EV_FORWARD / action_move_forward
+right --> left : EV_TURN_LEFT / action_turn_left
+right --> stopped : EV_STOP / action_stop
+right --> stopped : EV_OBSTACLE_DETECTED / action_handle_obstacle
+
+' Transitions from STOPPED
+stopped --> idle : EV_START / action_start
+stopped --> moving : EV_FORWARD / action_move_forward
+stopped --> left : EV_TURN_LEFT / action_turn_left
+stopped --> right : EV_TURN_RIGHT / action_turn_right
+
+' Transitions from ERROR
+error --> idle : EV_START / action_start
+
+' Add notes to explain key elements
+note right of idle
+  Robot is waiting for commands
+end note
+
+note right of stopped
+  Robot has been explicitly stopped
+  or has encountered an obstacle
+end note
+
+note right of error
+  Robot has encountered an error
+  Only start event can recover
+end note
+
+@enduml

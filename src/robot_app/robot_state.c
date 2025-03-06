@@ -27,15 +27,39 @@ static void action_nop(void);
 
 // Table de transition
 static transition_t transition_table[6][7] = {
-    // STATE_IDLE
-    [STATE_IDLE] = {
-        [EV_START] = {STATE_IDLE, action_start},
-        [EV_FORWARD] = {STATE_MOVING_FORWARD, action_move_forward},
-        [EV_TURN_LEFT] = {STATE_TURNING_LEFT, action_turn_left},
-        [EV_TURN_RIGHT] = {STATE_TURNING_RIGHT, action_turn_right},
-        // autres transitions...
-    },
-    // Autres états...
+    // Depuis STATE_IDLE
+    [STATE_IDLE][EV_START] = {STATE_IDLE, action_start},
+    [STATE_IDLE][EV_FORWARD] = {STATE_MOVING_FORWARD, action_move_forward},
+    [STATE_IDLE][EV_TURN_LEFT] = {STATE_TURNING_LEFT, action_turn_left},
+    [STATE_IDLE][EV_TURN_RIGHT] = {STATE_TURNING_RIGHT, action_turn_right},
+    [STATE_IDLE][EV_STOP] = {STATE_STOPPED, action_stop},
+    
+    // Depuis STATE_MOVING_FORWARD
+    [STATE_MOVING_FORWARD][EV_TURN_LEFT] = {STATE_TURNING_LEFT, action_turn_left},
+    [STATE_MOVING_FORWARD][EV_TURN_RIGHT] = {STATE_TURNING_RIGHT, action_turn_right},
+    [STATE_MOVING_FORWARD][EV_STOP] = {STATE_STOPPED, action_stop},
+    [STATE_MOVING_FORWARD][EV_OBSTACLE_DETECTED] = {STATE_STOPPED, action_handle_obstacle},
+    
+    // Depuis STATE_TURNING_LEFT
+    [STATE_TURNING_LEFT][EV_FORWARD] = {STATE_MOVING_FORWARD, action_move_forward},
+    [STATE_TURNING_LEFT][EV_TURN_RIGHT] = {STATE_TURNING_RIGHT, action_turn_right},
+    [STATE_TURNING_LEFT][EV_STOP] = {STATE_STOPPED, action_stop},
+    [STATE_TURNING_LEFT][EV_OBSTACLE_DETECTED] = {STATE_STOPPED, action_handle_obstacle},
+    
+    // Depuis STATE_TURNING_RIGHT
+    [STATE_TURNING_RIGHT][EV_FORWARD] = {STATE_MOVING_FORWARD, action_move_forward},
+    [STATE_TURNING_RIGHT][EV_TURN_LEFT] = {STATE_TURNING_LEFT, action_turn_left},
+    [STATE_TURNING_RIGHT][EV_STOP] = {STATE_STOPPED, action_stop},
+    [STATE_TURNING_RIGHT][EV_OBSTACLE_DETECTED] = {STATE_STOPPED, action_handle_obstacle},
+    
+    // Depuis STATE_STOPPED
+    [STATE_STOPPED][EV_START] = {STATE_IDLE, action_start},
+    [STATE_STOPPED][EV_FORWARD] = {STATE_MOVING_FORWARD, action_move_forward},
+    [STATE_STOPPED][EV_TURN_LEFT] = {STATE_TURNING_LEFT, action_turn_left},
+    [STATE_STOPPED][EV_TURN_RIGHT] = {STATE_TURNING_RIGHT, action_turn_right},
+    
+    // Depuis STATE_ERROR
+    [STATE_ERROR][EV_START] = {STATE_IDLE, action_start}
 };
 
 // Noms des états pour affichage/communication
@@ -64,13 +88,19 @@ void RobotState_free(RobotState* this) {
 void RobotState_handle_event(RobotState* this, robot_event_t event) {
     transition_t transition = transition_table[this->current_state][event];
     
-    // Appliquer l'action si définie
+    // Si l'action est définie, l'exécuter
     if (transition.action) {
         transition.action();
     }
     
-    // Mettre à jour l'état
-    this->current_state = transition.next_state;
+    // Si next_state est 0 (default) et que l'état actuel n'est pas 0,
+    // maintenir l'état actuel, sinon mettre à jour vers le next_state
+    if (transition.next_state == 0 && this->current_state != 0) {
+        // Maintenir l'état actuel
+    } else {
+        // Mettre à jour vers le nouvel état
+        this->current_state = transition.next_state;
+    }
 }
 
 robot_state_type_t RobotState_get_state(RobotState* this) {
